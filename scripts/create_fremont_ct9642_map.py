@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
-"""Create a Fremont, Nebraska map focused on Census Tract 9642.
+"""Create a professional cartographic context map for Fremont, NE — Census Tract 9642.
+
+Outputs (default ``output/`` directory):
+
+* ``fremont_ne_ct9642_poverty_map.png`` — high-resolution raster.
+* ``fremont_ne_ct9642_poverty_map.pdf`` — vector-quality PDF (print ready).
+* ``shapefiles/`` directory containing the layers shown on the map
+  (focus tract, neighborhood tracts with ACS poverty attributes, Fremont
+  place boundary, Dodge County boundary, clipped TIGER roads, and the map
+  extent), and a ``fremont_ne_ct9642_layers.zip`` archive of the same.
 
 The script downloads U.S. Census TIGER/Line geometries and ACS 5-year
-poverty counts, then renders a publication-style map with CT 9642
-highlighted over a subtle tract-level poverty-rate choropleth.
+poverty estimates, joins them, and renders a publication-style map with
+the focus tract highlighted, an inset locator, and a tract-level poverty
+classification overlay.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import zipfile
 from pathlib import Path
 from typing import Iterable
 
 import geopandas as gpd
-import matplotlib.colors as colors
+import matplotlib.colors as mcolors
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
+import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
 from matplotlib.cm import ScalarMappable
 from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from shapely.geometry import box
 
 
@@ -31,17 +45,42 @@ DODGE_COUNTY_FIPS = "053"
 TARGET_TRACT = "964200"
 TARGET_GEOID = f"{STATE_FIPS}{DODGE_COUNTY_FIPS}{TARGET_TRACT}"
 FREMONT_PLACE_GEOID = "3117670"
-PROJECT_CRS = "EPSG:26914"  # NAD83 / UTM zone 14N; good local distance behavior.
+PROJECT_CRS = "EPSG:26914"  # NAD83 / UTM zone 14N — accurate for eastern Nebraska.
+WGS84 = "EPSG:4326"
 
 DATA_DIR = Path("data")
 OUTPUT_DIR = Path("output")
+SHAPEFILE_SUBDIR = "shapefiles"
 
 TIGER_URLS = {
     "tracts": f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/TRACT/tl_{ACS_YEAR}_{STATE_FIPS}_tract.zip",
     "places": f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/PLACE/tl_{ACS_YEAR}_{STATE_FIPS}_place.zip",
     "counties": f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/COUNTY/tl_{ACS_YEAR}_us_county.zip",
     "roads": f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/ROADS/tl_{ACS_YEAR}_{STATE_FIPS}{DODGE_COUNTY_FIPS}_roads.zip",
+    "states": f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/STATE/tl_{ACS_YEAR}_us_state.zip",
 }
+
+# Color palette — restrained, print-friendly.
+PALETTE = {
+    "background": "#ffffff",
+    "land": "#f4efe4",
+    "tract_edge": "#b6ad9c",
+    "county_edge": "#7a7367",
+    "city_edge": "#1f4e6b",
+    "focus_fill": "#1f6feb",
+    "focus_edge": "#0a2540",
+    "road_case": "#ffffff",
+    "road_major": "#5d5d5d",
+    "road_local": "#cdc7bb",
+    "label_dark": "#1d1d1d",
+    "label_muted": "#5d5648",
+    "frame": "#2b2b2b",
+    "no_data": "#ececec",
+}
+
+POVERTY_BREAKS = [0, 5, 10, 15, 20, 30, 40]
+POVERTY_LABELS = ["< 5%", "5 – 10%", "10 – 15%", "15 – 20%", "20 – 30%", "≥ 30%"]
+POVERTY_COLORS = ["#fff5d6", "#ffd89c", "#fdae61", "#f46d43", "#d73027", "#7a0177"]
 
 
 def fetch_acs_poverty(cache_path: Path) -> pd.DataFrame:
@@ -64,14 +103,14 @@ def fetch_acs_poverty(cache_path: Path) -> pd.DataFrame:
     columns, *records = raw
     df = pd.DataFrame(records, columns=columns)
     df["GEOID"] = df["state"] + df["county"] + df["tract"]
-    df["poverty_total"] = pd.to_numeric(df["B17001_001E"], errors="coerce")
-    df["poverty_count"] = pd.to_numeric(df["B17001_002E"], errors="coerce")
-    df["poverty_rate"] = (df["poverty_count"] / df["poverty_total"]) * 100
-    return df[["GEOID", "NAME", "poverty_total", "poverty_count", "poverty_rate"]]
+    df["pov_total"] = pd.to_numeric(df["B17001_001E"], errors="coerce")
+    df["pov_count"] = pd.to_numeric(df["B17001_002E"], errors="coerce")
+    df["pov_rate"] = (df["pov_count"] / df["pov_total"]) * 100
+    return df[["GEOID", "NAME", "pov_total", "pov_count", "pov_rate"]]
 
 
 def read_tiger_layer(name: str) -> gpd.GeoDataFrame:
-    """Read a TIGER/Line zipfile URL using GeoPandas."""
+    """Read a TIGER/Line zipfile URL using GeoPandas (cached by GDAL)."""
     return gpd.read_file(TIGER_URLS[name], engine="pyogrio")
 
 
@@ -82,73 +121,202 @@ def buffered_extent(bounds: Iterable[float], x_pad: float, y_pad: float) -> tupl
     return (minx - width * x_pad, miny - height * y_pad, maxx + width * x_pad, maxy + height * y_pad)
 
 
+def classify_poverty(values: pd.Series) -> pd.Series:
+    """Bin a numeric Series into the configured poverty categories."""
+    return pd.cut(values, bins=POVERTY_BREAKS, labels=POVERTY_LABELS, include_lowest=True, right=False)
+
+
 def add_scale_bar(ax: plt.Axes, length_miles: int = 2) -> None:
-    """Draw a simple alternating black/white scale bar."""
+    """Draw a clean two-segment scale bar in projected meters."""
     x0, x1 = ax.get_xlim()
     y0, y1 = ax.get_ylim()
     length_m = length_miles * 1609.344
     segment_m = length_m / 2
-    start_x = x0 + (x1 - x0) * 0.06
-    start_y = y0 + (y1 - y0) * 0.07
-    height = (y1 - y0) * 0.012
+    start_x = x0 + (x1 - x0) * 0.05
+    start_y = y0 + (y1 - y0) * 0.05
+    height = (y1 - y0) * 0.011
 
-    for idx, facecolor in enumerate(["black", "white"]):
+    for idx, facecolor in enumerate(["#1d1d1d", "#ffffff"]):
         rect = mpatches.Rectangle(
             (start_x + idx * segment_m, start_y),
             segment_m,
             height,
             facecolor=facecolor,
-            edgecolor="black",
+            edgecolor="#1d1d1d",
             linewidth=0.8,
-            zorder=20,
+            zorder=30,
         )
         ax.add_patch(rect)
-    ax.text(start_x, start_y + height * 2.2, "0", ha="center", va="bottom", fontsize=8)
-    ax.text(start_x + segment_m, start_y + height * 2.2, f"{length_miles // 2}", ha="center", va="bottom", fontsize=8)
-    ax.text(start_x + length_m, start_y + height * 2.2, f"{length_miles} mi", ha="center", va="bottom", fontsize=8)
+
+    label_kwargs = dict(ha="center", va="bottom", fontsize=7.5, color=PALETTE["label_dark"], zorder=31)
+    ax.text(start_x, start_y + height * 1.3, "0", **label_kwargs)
+    ax.text(start_x + segment_m, start_y + height * 1.3, f"{length_miles // 2}", **label_kwargs)
+    ax.text(start_x + length_m, start_y + height * 1.3, f"{length_miles} mi", **label_kwargs)
 
 
 def add_north_arrow(ax: plt.Axes) -> None:
-    """Add a north arrow in axes coordinates."""
+    """A minimal north arrow rendered in axes coordinates."""
     arrow = FancyArrowPatch(
-        (0.93, 0.82),
-        (0.93, 0.94),
+        (0.955, 0.85),
+        (0.955, 0.95),
         transform=ax.transAxes,
         arrowstyle="-|>",
-        mutation_scale=18,
-        linewidth=1.3,
-        color="#1f1f1f",
-        zorder=30,
+        mutation_scale=16,
+        linewidth=1.4,
+        color=PALETTE["frame"],
+        zorder=40,
     )
     ax.add_patch(arrow)
-    ax.text(0.93, 0.955, "N", transform=ax.transAxes, ha="center", va="bottom", fontsize=12, weight="bold")
-
-
-def label_geometry(ax: plt.Axes, geometry, label: str, *, dy: float = 0, size: int = 11, weight: str = "normal") -> None:
-    point = geometry.representative_point()
     ax.text(
-        point.x,
-        point.y + dy,
-        label,
-        ha="center",
-        va="center",
-        fontsize=size,
-        weight=weight,
-        color="#1f1f1f",
-        path_effects=[],
-        zorder=25,
+        0.955, 0.965, "N",
+        transform=ax.transAxes,
+        ha="center", va="bottom",
+        fontsize=11, weight="bold", color=PALETTE["frame"], zorder=41,
     )
 
 
-def build_map(output_path: Path) -> None:
+def label_point(
+    ax: plt.Axes,
+    x: float, y: float,
+    text: str,
+    *,
+    size: int = 10,
+    weight: str = "normal",
+    color: str = PALETTE["label_dark"],
+    halo: bool = True,
+    zorder: int = 25,
+    italic: bool = False,
+) -> None:
+    style = "italic" if italic else "normal"
+    txt = ax.text(
+        x, y, text,
+        ha="center", va="center",
+        fontsize=size, weight=weight, color=color, style=style, zorder=zorder,
+    )
+    if halo:
+        txt.set_path_effects([
+            path_effects.Stroke(linewidth=2.6, foreground="white"),
+            path_effects.Normal(),
+        ])
+
+
+def draw_locator_inset(parent_ax: plt.Axes, states: gpd.GeoDataFrame, dodge: gpd.GeoDataFrame) -> None:
+    """Inset map: outline of Nebraska with Dodge County highlighted."""
+    inset = inset_axes(
+        parent_ax,
+        width="20%", height="18%",
+        loc="upper left",
+        bbox_to_anchor=(0.012, -0.012, 1.0, 1.0),
+        bbox_transform=parent_ax.transAxes,
+        borderpad=0.6,
+    )
+    nebraska = states[states["STATEFP"] == STATE_FIPS].to_crs(PROJECT_CRS)
+    nebraska.plot(ax=inset, color="#f4efe4", edgecolor="#7a7367", linewidth=1.0, zorder=2)
+    dodge.plot(ax=inset, color=PALETTE["focus_fill"], alpha=0.9, edgecolor=PALETTE["focus_edge"], linewidth=1.2, zorder=3)
+
+    minx, miny, maxx, maxy = nebraska.total_bounds
+    pad = 0.02 * max(maxx - minx, maxy - miny)
+    inset.set_xlim(minx - pad, maxx + pad)
+    inset.set_ylim(miny - pad, maxy + pad)
+    inset.set_aspect("equal")
+    inset.set_xticks([])
+    inset.set_yticks([])
+    for spine in inset.spines.values():
+        spine.set_edgecolor(PALETTE["frame"])
+        spine.set_linewidth(0.8)
+    inset.set_facecolor("#ffffff")
+    inset.set_title("Nebraska", fontsize=7.5, color=PALETTE["label_dark"], pad=2, weight="bold")
+
+
+def style_main_axes(ax: plt.Axes) -> None:
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for side, spine in ax.spines.items():
+        spine.set_visible(True)
+        spine.set_edgecolor(PALETTE["frame"])
+        spine.set_linewidth(0.9)
+
+
+def write_shapefiles(
+    out_dir: Path,
+    *,
+    target: gpd.GeoDataFrame,
+    tracts_view: gpd.GeoDataFrame,
+    fremont: gpd.GeoDataFrame,
+    dodge: gpd.GeoDataFrame,
+    roads_view: gpd.GeoDataFrame,
+    extent_polygon: gpd.GeoDataFrame,
+) -> Path:
+    """Write each map layer to its own shapefile and bundle them into a zip.
+
+    Shapefiles are written in the projected CRS used by the map
+    (NAD83 / UTM zone 14N) so distances and areas are immediately usable
+    in downstream GIS workflows.
+    """
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    layers: dict[str, gpd.GeoDataFrame] = {
+        "ct9642_focus_tract": target,
+        "neighborhood_tracts_acs": tracts_view,
+        "fremont_place": fremont,
+        "dodge_county": dodge,
+        "roads_clipped": roads_view,
+        "map_extent": extent_polygon,
+    }
+
+    for name, gdf in layers.items():
+        if gdf is None or gdf.empty:
+            continue
+        layer_dir = out_dir / name
+        layer_dir.mkdir(parents=True, exist_ok=True)
+        # Shapefile field names are limited to 10 characters; reduce defensively.
+        truncated = gdf.copy()
+        rename: dict[str, str] = {}
+        seen: set[str] = set()
+        for col in truncated.columns:
+            if col == "geometry":
+                continue
+            short = col[:10]
+            base = short
+            i = 1
+            while short in seen:
+                short = f"{base[:8]}{i:02d}"
+                i += 1
+            seen.add(short)
+            if short != col:
+                rename[col] = short
+        if rename:
+            truncated = truncated.rename(columns=rename)
+        truncated.to_file(layer_dir / f"{name}.shp", driver="ESRI Shapefile", engine="pyogrio")
+
+    archive = out_dir.parent / "fremont_ne_ct9642_layers.zip"
+    if archive.exists():
+        archive.unlink()
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(out_dir.rglob("*")):
+            if path.is_file():
+                zf.write(path, path.relative_to(out_dir.parent))
+    return archive
+
+
+def build_map(
+    output_dir: Path,
+    *,
+    basename: str = "fremont_ne_ct9642_poverty_map",
+    write_shp: bool = True,
+) -> dict[str, Path]:
     DATA_DIR.mkdir(exist_ok=True)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     acs = fetch_acs_poverty(DATA_DIR / f"acs_{ACS_YEAR}_dodge_county_poverty.json")
     tracts = read_tiger_layer("tracts")
     places = read_tiger_layer("places")
     counties = read_tiger_layer("counties")
     roads = read_tiger_layer("roads")
+    states = read_tiger_layer("states")
 
     dodge = counties[(counties["STATEFP"] == STATE_FIPS) & (counties["COUNTYFP"] == DODGE_COUNTY_FIPS)].to_crs(PROJECT_CRS)
     fremont = places[places["GEOID"] == FREMONT_PLACE_GEOID].to_crs(PROJECT_CRS)
@@ -161,120 +329,244 @@ def build_map(output_path: Path) -> None:
         raise RuntimeError(f"Could not find target Census Tract GEOID {TARGET_GEOID}.")
 
     extent = buffered_extent(target.total_bounds, x_pad=1.25, y_pad=1.00)
-    extent_polygon = gpd.GeoSeries([box(*extent)], crs=PROJECT_CRS)
-    tracts_view = dodge_tracts[dodge_tracts.intersects(extent_polygon.iloc[0])]
-    roads_view = roads[roads.intersects(extent_polygon.iloc[0])]
+    extent_geom = box(*extent)
+    extent_polygon = gpd.GeoDataFrame(
+        {"name": ["map_extent"]}, geometry=[extent_geom], crs=PROJECT_CRS,
+    )
 
-    fig, ax = plt.subplots(figsize=(11, 9), dpi=220)
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("#f6f2e9")
+    tracts_view = dodge_tracts[dodge_tracts.intersects(extent_geom)].copy()
+    tracts_view["pov_class"] = classify_poverty(tracts_view["pov_rate"])
+    roads_view = roads[roads.intersects(extent_geom)].copy()
 
-    dodge.boundary.plot(ax=ax, color="#9a958a", linewidth=1.1, zorder=2)
+    cmap = mcolors.ListedColormap(POVERTY_COLORS)
+    cmap.set_bad(PALETTE["no_data"])
+    norm = mcolors.BoundaryNorm(POVERTY_BREAKS, cmap.N)
+
+    plt.rcParams.update({
+        "font.family": "DejaVu Sans",
+        "axes.titlesize": 11,
+        "axes.titleweight": "bold",
+    })
+
+    fig, ax = plt.subplots(figsize=(12, 9.5), dpi=200)
+    fig.patch.set_facecolor(PALETTE["background"])
+    ax.set_facecolor(PALETTE["land"])
+
+    dodge.boundary.plot(ax=ax, color=PALETTE["county_edge"], linewidth=1.2, zorder=2)
+
     tracts_view.plot(
         ax=ax,
-        column="poverty_rate",
-        cmap="YlOrRd",
-        norm=colors.Normalize(vmin=0, vmax=max(25, tracts_view["poverty_rate"].max())),
-        alpha=0.28,
-        edgecolor="#aa9e8e",
-        linewidth=0.6,
+        column="pov_rate",
+        cmap=cmap,
+        norm=norm,
+        alpha=0.55,
+        edgecolor=PALETTE["tract_edge"],
+        linewidth=0.55,
         zorder=3,
-        missing_kwds={"color": "#efefef", "edgecolor": "#bdbdbd", "hatch": "///", "label": "No ACS data"},
+        missing_kwds={"color": PALETTE["no_data"], "edgecolor": "#bdbdbd", "hatch": "///"},
     )
 
-    major_roads = roads_view[roads_view["MTFCC"].isin(["S1100", "S1200"])]
-    local_roads = roads_view[~roads_view["MTFCC"].isin(["S1100", "S1200"])]
-    local_roads.plot(ax=ax, color="#d5d0c6", linewidth=0.35, alpha=0.75, zorder=4)
-    major_roads.plot(ax=ax, color="#ffffff", linewidth=2.6, alpha=0.95, zorder=5)
-    major_roads.plot(ax=ax, color="#707070", linewidth=1.05, alpha=0.95, zorder=6)
+    major_codes = {"S1100", "S1200"}
+    major_roads = roads_view[roads_view["MTFCC"].isin(major_codes)]
+    local_roads = roads_view[~roads_view["MTFCC"].isin(major_codes)]
+    local_roads.plot(ax=ax, color=PALETTE["road_local"], linewidth=0.4, alpha=0.85, zorder=4)
+    major_roads.plot(ax=ax, color=PALETTE["road_case"], linewidth=2.8, alpha=0.95, zorder=5)
+    major_roads.plot(ax=ax, color=PALETTE["road_major"], linewidth=1.1, alpha=0.95, zorder=6)
 
-    fremont.boundary.plot(ax=ax, color="#245b7d", linewidth=1.4, linestyle="--", zorder=8)
-    target.plot(ax=ax, color="#2f80ed", alpha=0.40, edgecolor="#08306b", linewidth=3.0, zorder=10)
-    target.boundary.plot(ax=ax, color="#08306b", linewidth=3.2, zorder=11)
+    fremont.boundary.plot(ax=ax, color=PALETTE["city_edge"], linewidth=1.6, linestyle=(0, (5, 3)), zorder=8)
 
-    label_geometry(ax, fremont.geometry.iloc[0], "City of Fremont", size=12, weight="bold")
-    dodge_label_point = dodge.geometry.iloc[0].representative_point()
-    ax.text(
-        extent[0] + (extent[2] - extent[0]) * 0.76,
-        extent[1] + (extent[3] - extent[1]) * 0.18,
+    target_buffer = target.copy()
+    target_buffer["geometry"] = target.buffer(60)
+    target_buffer.plot(ax=ax, color="#0a2540", alpha=0.18, zorder=9)
+    target.plot(ax=ax, color=PALETTE["focus_fill"], alpha=0.45, edgecolor=PALETTE["focus_edge"], linewidth=2.6, zorder=10)
+    target.boundary.plot(ax=ax, color=PALETTE["focus_edge"], linewidth=2.8, zorder=11)
+
+    # Place the city label inside the visible extent, above the focus tract
+    # so it never overlaps the highlighted polygon or its label.
+    target_geom = target.geometry.iloc[0]
+    target_top = target_geom.bounds[3]
+    label_x = (extent[0] + extent[2]) / 2
+    label_y = min(extent[3] - (extent[3] - extent[1]) * 0.10,
+                  target_top + (extent[3] - extent[1]) * 0.18)
+    label_point(ax, label_x, label_y, "City of Fremont",
+                size=13, weight="bold", color=PALETTE["city_edge"])
+    label_point(
+        ax,
+        extent[0] + (extent[2] - extent[0]) * 0.10,
+        extent[1] + (extent[3] - extent[1]) * 0.55,
         "Dodge County",
-        ha="center",
-        va="center",
-        fontsize=12,
-        color="#5a5148",
-        style="italic",
-        zorder=24,
+        size=12, italic=True, color=PALETTE["label_muted"],
     )
-    label_geometry(ax, target.geometry.iloc[0], "Census Tract 9642", dy=450, size=11, weight="bold")
 
-    for _, row in major_roads.dropna(subset=["FULLNAME"]).drop_duplicates("FULLNAME").iterrows():
-        if row.geometry.length < 700:
-            continue
-        point = row.geometry.interpolate(0.5, normalized=True)
+    target_pt = target.geometry.iloc[0].representative_point()
+    label_point(ax, target_pt.x, target_pt.y + 380, "Census Tract 9642",
+                size=11, weight="bold", color=PALETTE["focus_edge"])
+
+    # Place at most one label per unique road name and only inside the visible
+    # extent so labels don't drift past the frame or under the locator inset.
+    inset_clip = box(
+        extent[0], extent[1] + (extent[3] - extent[1]) * 0.78,
+        extent[0] + (extent[2] - extent[0]) * 0.30, extent[3],
+    )
+    legend_clip = box(
+        extent[0] + (extent[2] - extent[0]) * 0.62, extent[1],
+        extent[2], extent[1] + (extent[3] - extent[1]) * 0.30,
+    )
+    seen_names: set[str] = set()
+    for _, row in major_roads.dropna(subset=["FULLNAME"]).iterrows():
         name = row["FULLNAME"]
-        if any(token in name for token in ["US Hwy", "State Hwy", "Broad St", "Main St", "23rd", "6th"]):
-            ax.text(point.x, point.y, name, fontsize=6.5, color="#4d4d4d", ha="center", va="center", zorder=15)
+        if not name or name in seen_names:
+            continue
+        if row.geometry.length < 1200:
+            continue
+        if not any(token in name for token in ["US Hwy", "State Hwy", "Broad St", "Main St"]):
+            continue
+        clipped = row.geometry.intersection(extent_geom)
+        if clipped.is_empty:
+            continue
+        clipped = clipped.difference(inset_clip).difference(legend_clip)
+        if clipped.is_empty or clipped.length < 600:
+            continue
+        # MultiLineString fallback: pick the longest segment for label placement.
+        if clipped.geom_type == "MultiLineString":
+            segment = max(list(clipped.geoms), key=lambda g: g.length)
+        else:
+            segment = clipped
+        seen_names.add(name)
+        point = segment.interpolate(0.5, normalized=True)
+        if point.is_empty:
+            continue
+        label_point(ax, point.x, point.y, name, size=7, color="#3a3a3a", weight="normal", halo=True, zorder=15)
 
     ax.set_xlim(extent[0], extent[2])
     ax.set_ylim(extent[1], extent[3])
-    ax.set_aspect("equal")
-    ax.axis("off")
+    style_main_axes(ax)
 
     add_scale_bar(ax, length_miles=2)
     add_north_arrow(ax)
+    draw_locator_inset(ax, states, dodge)
 
-    poverty_handle = ScalarMappable(
-        norm=colors.Normalize(vmin=0, vmax=max(25, tracts_view["poverty_rate"].max())),
-        cmap="YlOrRd",
+    sm = ScalarMappable(norm=norm, cmap=cmap)
+    cbar = fig.colorbar(
+        sm, ax=ax,
+        orientation="horizontal",
+        fraction=0.032, pad=0.04, shrink=0.55,
+        ticks=POVERTY_BREAKS,
+        spacing="proportional",
     )
-    cbar = fig.colorbar(poverty_handle, ax=ax, orientation="horizontal", fraction=0.035, pad=0.018, shrink=0.55)
-    cbar.set_label("ACS poverty rate by census tract (%) - subtle contextual overlay", fontsize=9)
+    cbar.set_label(
+        f"ACS {ACS_YEAR} 5-year poverty rate by census tract (%)",
+        fontsize=9, labelpad=4,
+    )
     cbar.ax.tick_params(labelsize=8)
+    tick_labels = [str(b) for b in POVERTY_BREAKS[:-1]] + [f"{POVERTY_BREAKS[-1]}+"]
+    cbar.ax.set_xticklabels(tick_labels)
+    cbar.outline.set_edgecolor(PALETTE["frame"])
+    cbar.outline.set_linewidth(0.7)
 
     legend_handles = [
-        mpatches.Patch(facecolor="#2f80ed", edgecolor="#08306b", linewidth=2.2, alpha=0.55, label="Highlighted focus: Census Tract 9642"),
-        mlines.Line2D([], [], color="#245b7d", linestyle="--", linewidth=1.4, label="City of Fremont boundary"),
-        mlines.Line2D([], [], color="#707070", linewidth=1.2, label="Major roads"),
-        mlines.Line2D([], [], color="#9a958a", linewidth=1.1, label="Dodge County boundary"),
+        mpatches.Patch(facecolor=PALETTE["focus_fill"], edgecolor=PALETTE["focus_edge"], linewidth=2.0,
+                       alpha=0.55, label="Focus area: Census Tract 9642"),
+        mlines.Line2D([], [], color=PALETTE["city_edge"], linestyle=(0, (5, 3)), linewidth=1.6,
+                      label="City of Fremont boundary"),
+        mlines.Line2D([], [], color=PALETTE["road_major"], linewidth=1.4, label="Major roads"),
+        mlines.Line2D([], [], color=PALETTE["road_local"], linewidth=1.2, label="Local roads"),
+        mlines.Line2D([], [], color=PALETTE["county_edge"], linewidth=1.2, label="Dodge County boundary"),
+        mpatches.Patch(facecolor=PALETTE["no_data"], edgecolor="#bdbdbd", hatch="///", label="No ACS data"),
     ]
-    ax.legend(handles=legend_handles, loc="lower right", frameon=True, framealpha=0.92, fontsize=8.5, title="Map layers", title_fontsize=9)
+    legend = ax.legend(
+        handles=legend_handles,
+        loc="lower right",
+        frameon=True,
+        framealpha=0.95,
+        fontsize=8.5,
+        title="Map layers",
+        title_fontsize=9,
+        borderpad=0.7,
+    )
+    legend.get_frame().set_edgecolor(PALETTE["frame"])
+    legend.get_frame().set_linewidth(0.6)
 
-    target_rate = target["poverty_rate"].iloc[0]
-    fig.suptitle("Fremont, Nebraska - Census Tract 9642 Context Map", fontsize=16, weight="bold", y=0.97)
+    target_rate = target["pov_rate"].iloc[0]
+    target_pop = target["pov_total"].iloc[0]
+    target_pov_count = target["pov_count"].iloc[0]
+
+    fig.suptitle(
+        "Fremont, Nebraska  ·  Census Tract 9642 — Cartographic Context",
+        fontsize=16, weight="bold", y=0.965, color=PALETTE["label_dark"],
+    )
     ax.set_title(
-        f"Dodge County tracts shown with subtle ACS {ACS_YEAR} 5-year poverty-rate overlay; "
-        f"CT 9642 poverty rate: {target_rate:.1f}%",
-        fontsize=10,
-        pad=8,
+        f"Tract-level poverty classification (ACS {ACS_YEAR}, 5-year)   |   "
+        f"CT 9642 poverty rate: {target_rate:.1f}%   "
+        f"({int(target_pov_count):,} of {int(target_pop):,} persons)",
+        fontsize=10, pad=8, color=PALETTE["label_dark"],
+    )
+
+    fig.text(
+        0.012, 0.008,
+        "Projection: NAD83 / UTM Zone 14N (EPSG:26914)",
+        ha="left", va="bottom", fontsize=7.5, color=PALETTE["label_muted"],
     )
     fig.text(
-        0.5,
-        0.02,
-        "Source: U.S. Census Bureau, American Community Survey "
-        f"{ACS_YEAR} 5-Year Estimates, table B17001 (poverty status); "
-        f"U.S. Census Bureau TIGER/Line Shapefiles {ACS_YEAR} (tracts, places, counties, roads).",
-        ha="center",
-        va="bottom",
-        fontsize=8,
-        color="#333333",
+        0.988, 0.008,
+        f"Sources: U.S. Census Bureau TIGER/Line {ACS_YEAR}; "
+        f"ACS {ACS_YEAR} 5-Year Estimates, table B17001",
+        ha="right", va="bottom", fontsize=7.5, color=PALETTE["label_muted"],
     )
 
-    fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor())
+    fig.subplots_adjust(left=0.035, right=0.985, top=0.92, bottom=0.10)
+
+    png_path = output_dir / f"{basename}.png"
+    pdf_path = output_dir / f"{basename}.pdf"
+    fig.savefig(png_path, facecolor=fig.get_facecolor())
+    fig.savefig(pdf_path, facecolor=fig.get_facecolor())
     plt.close(fig)
-    print(f"Wrote {output_path}")
+
+    written: dict[str, Path] = {"png": png_path, "pdf": pdf_path}
+    print(f"Wrote {png_path}")
+    print(f"Wrote {pdf_path}")
+
+    if write_shp:
+        shp_dir = output_dir / SHAPEFILE_SUBDIR
+        archive = write_shapefiles(
+            shp_dir,
+            target=target,
+            tracts_view=tracts_view.drop(columns=["pov_class"], errors="ignore"),
+            fremont=fremont,
+            dodge=dodge,
+            roads_view=roads_view,
+            extent_polygon=extent_polygon,
+        )
+        written["shapefiles_dir"] = shp_dir
+        written["shapefiles_zip"] = archive
+        print(f"Wrote shapefiles to {shp_dir}/")
+        print(f"Wrote {archive}")
+
+    return written
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--output",
+        "--output-dir",
         type=Path,
-        default=OUTPUT_DIR / "fremont_ne_ct9642_poverty_map.png",
-        help="Output image path.",
+        default=OUTPUT_DIR,
+        help="Output directory (defaults to ./output).",
+    )
+    parser.add_argument(
+        "--basename",
+        type=str,
+        default="fremont_ne_ct9642_poverty_map",
+        help="Filename stem used for the rendered PNG and PDF.",
+    )
+    parser.add_argument(
+        "--no-shapefiles",
+        action="store_true",
+        help="Skip writing shapefile exports.",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    build_map(args.output)
+    build_map(args.output_dir, basename=args.basename, write_shp=not args.no_shapefiles)

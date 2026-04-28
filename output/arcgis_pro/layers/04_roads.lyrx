@@ -1,0 +1,482 @@
+{
+  "type": "CIMLayerDocument",
+  "version": "3.0.0",
+  "build": 36056,
+  "layers": [
+    "CIMPATH=Map/roads_clipped.xml"
+  ],
+  "layerDefinitions": [
+    {
+      "type": "CIMFeatureLayer",
+      "name": "Roads (by TIGER MTFCC)",
+      "uRI": "CIMPATH=Map/roads_clipped.xml",
+      "sourceModifiedTime": {
+        "type": "TimeInstant"
+      },
+      "useSourceMetadata": true,
+      "description": "",
+      "layerElevation": {
+        "type": "CIMLayerElevationSurface",
+        "mapElevationID": "{8AC7B2D6-8E66-4F9A-9C40-2E1C36F3B3A2}"
+      },
+      "expanded": true,
+      "layerType": "Operational",
+      "showLegends": true,
+      "visibility": true,
+      "displayCacheType": "Permanent",
+      "maxDisplayCacheAge": 5,
+      "showPopups": true,
+      "serviceLayerID": -1,
+      "refreshRate": -1,
+      "refreshRateUnit": "esriTimeUnitsSeconds",
+      "blendingMode": "Alpha",
+      "allowDrapingOnIntegratedMesh": true,
+      "featureTable": {
+        "type": "CIMFeatureTable",
+        "displayField": "FID",
+        "editable": true,
+        "dataConnection": {
+          "type": "CIMStandardDataConnection",
+          "workspaceConnectionString": "DATABASE=..\\data\\roads_clipped",
+          "workspaceFactory": "Shapefile",
+          "dataset": "roads_clipped.shp",
+          "datasetType": "esriDTShapefile"
+        },
+        "studyAreaSpatialRel": "esriSpatialRelUndefined",
+        "searchOrder": "esriSearchOrderSpatial"
+      },
+      "featureBlendingMode": "Alpha",
+      "renderer": {
+        "type": "CIMUniqueValueRenderer",
+        "colorRamp": null,
+        "defaultLabel": "Other",
+        "defaultSymbol": {
+          "type": "CIMSymbolReference",
+          "symbol": {
+            "type": "CIMLineSymbol",
+            "symbolLayers": [
+              {
+                "type": "CIMSolidStroke",
+                "enable": true,
+                "capStyle": "Round",
+                "joinStyle": "Round",
+                "lineStyle3D": "Strip",
+                "miterLimit": 10,
+                "width": 0.5,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    207,
+                    200,
+                    186,
+                    100
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "defaultSymbolPatch": "Default",
+        "fields": [
+          "MTFCC"
+        ],
+        "groups": [
+          {
+            "type": "CIMUniqueValueGroup",
+            "classes": [
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Primary highway",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 2.4,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            91,
+                            82,
+                            74,
+                            100
+                          ]
+                        }
+                      },
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 4.0,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            255,
+                            255,
+                            255,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1100"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Secondary highway",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 1.5,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            122,
+                            113,
+                            100,
+                            100
+                          ]
+                        }
+                      },
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 2.6,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            255,
+                            255,
+                            255,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1200"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Local road",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 0.6,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            207,
+                            200,
+                            186,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1400"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Ramp / connector",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 1.2,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            122,
+                            113,
+                            100,
+                            100
+                          ]
+                        }
+                      },
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 2.2,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            255,
+                            255,
+                            255,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1630"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Vehicular trail",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 0.5,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            207,
+                            200,
+                            186,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1500"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Alley",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 0.4,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            207,
+                            200,
+                            186,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1730"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Service drive",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 0.4,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            207,
+                            200,
+                            186,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1740"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              },
+              {
+                "type": "CIMUniqueValueClass",
+                "label": "Private road",
+                "patch": "Default",
+                "symbol": {
+                  "type": "CIMSymbolReference",
+                  "symbol": {
+                    "type": "CIMLineSymbol",
+                    "symbolLayers": [
+                      {
+                        "type": "CIMSolidStroke",
+                        "enable": true,
+                        "capStyle": "Round",
+                        "joinStyle": "Round",
+                        "lineStyle3D": "Strip",
+                        "miterLimit": 10,
+                        "width": 0.4,
+                        "color": {
+                          "type": "CIMRGBColor",
+                          "values": [
+                            207,
+                            200,
+                            186,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values": [
+                  {
+                    "type": "CIMUniqueValue",
+                    "fieldValues": [
+                      "S1750"
+                    ]
+                  }
+                ],
+                "visible": true,
+                "editable": true
+              }
+            ],
+            "heading": "Road classification (TIGER MTFCC)"
+          }
+        ],
+        "useDefaultSymbol": true,
+        "polygonSymbolColorTarget": "Fill"
+      }
+    }
+  ],
+  "binaryReferences": [],
+  "elevationSurfaceLayerDefinitions": [],
+  "rGBColorProfile": "sRGB IEC61966-2.1",
+  "cMYKColorProfile": "U.S. Web Coated (SWOP) v2"
+}

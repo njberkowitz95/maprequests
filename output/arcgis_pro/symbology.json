@@ -1,0 +1,139 @@
+{
+  "project_crs": "EPSG:26914",
+  "datum": "NAD83",
+  "units": "meters",
+  "page_size_inches": [
+    13.0,
+    9.5
+  ],
+  "title_font": {
+    "family": "Calibri",
+    "size_pt": 20,
+    "weight": "bold"
+  },
+  "subtitle_font": {
+    "family": "Calibri",
+    "size_pt": 11,
+    "weight": "regular"
+  },
+  "label_font": {
+    "family": "Calibri",
+    "size_pt": 9,
+    "weight": "regular"
+  },
+  "footer_font": {
+    "family": "Calibri",
+    "size_pt": 7.6,
+    "weight": "regular"
+  },
+  "palette": {
+    "focus_fill": "#1f6feb",
+    "focus_edge": "#0a2540",
+    "city_edge": "#1f4e6b",
+    "county_edge": "#5e574a",
+    "highway": "#5b524a",
+    "arterial": "#7a7164",
+    "local": "#cfc8ba",
+    "water_fill": "#aac9e0",
+    "water_edge": "#7fa7c4",
+    "extent_edge": "#0a2540"
+  },
+  "poverty_classes": [
+    {
+      "upper": 5.0,
+      "label": "< 5%",
+      "color": "#fff7d6"
+    },
+    {
+      "upper": 10.0,
+      "label": "5 – 10%",
+      "color": "#fee08b"
+    },
+    {
+      "upper": 15.0,
+      "label": "10 – 15%",
+      "color": "#fdae61"
+    },
+    {
+      "upper": 20.0,
+      "label": "15 – 20%",
+      "color": "#f46d43"
+    },
+    {
+      "upper": 30.0,
+      "label": "20 – 30%",
+      "color": "#d73027"
+    },
+    {
+      "upper": 100.0,
+      "label": "≥ 30%",
+      "color": "#7a0177"
+    }
+  ],
+  "road_classes": [
+    {
+      "mtfcc": "S1100",
+      "label": "Primary highway",
+      "color": "#5b524a",
+      "width": 2.4,
+      "case": true,
+      "case_width": 4.0
+    },
+    {
+      "mtfcc": "S1200",
+      "label": "Secondary highway",
+      "color": "#7a7164",
+      "width": 1.5,
+      "case": true,
+      "case_width": 2.6
+    },
+    {
+      "mtfcc": "S1400",
+      "label": "Local road",
+      "color": "#cfc8ba",
+      "width": 0.6,
+      "case": false,
+      "case_width": 0.0
+    },
+    {
+      "mtfcc": "S1630",
+      "label": "Ramp / connector",
+      "color": "#7a7164",
+      "width": 1.2,
+      "case": true,
+      "case_width": 2.2
+    },
+    {
+      "mtfcc": "S1500",
+      "label": "Vehicular trail",
+      "color": "#cfc8ba",
+      "width": 0.5,
+      "case": false,
+      "case_width": 0.0
+    },
+    {
+      "mtfcc": "S1730",
+      "label": "Alley",
+      "color": "#cfc8ba",
+      "width": 0.4,
+      "case": false,
+      "case_width": 0.0
+    },
+    {
+      "mtfcc": "S1740",
+      "label": "Service drive",
+      "color": "#cfc8ba",
+      "width": 0.4,
+      "case": false,
+      "case_width": 0.0
+    },
+    {
+      "mtfcc": "S1750",
+      "label": "Private road",
+      "color": "#cfc8ba",
+      "width": 0.4,
+      "case": false,
+      "case_width": 0.0
+    }
+  ]
+}

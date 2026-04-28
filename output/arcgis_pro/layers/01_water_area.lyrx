@@ -1,0 +1,99 @@
+{
+  "type": "CIMLayerDocument",
+  "version": "3.0.0",
+  "build": 36056,
+  "layers": [
+    "CIMPATH=Map/water_area.xml"
+  ],
+  "layerDefinitions": [
+    {
+      "type": "CIMFeatureLayer",
+      "name": "Water — area features",
+      "uRI": "CIMPATH=Map/water_area.xml",
+      "sourceModifiedTime": {
+        "type": "TimeInstant"
+      },
+      "useSourceMetadata": true,
+      "description": "",
+      "layerElevation": {
+        "type": "CIMLayerElevationSurface",
+        "mapElevationID": "{8AC7B2D6-8E66-4F9A-9C40-2E1C36F3B3A2}"
+      },
+      "expanded": true,
+      "layerType": "Operational",
+      "showLegends": true,
+      "visibility": true,
+      "displayCacheType": "Permanent",
+      "maxDisplayCacheAge": 5,
+      "showPopups": true,
+      "serviceLayerID": -1,
+      "refreshRate": -1,
+      "refreshRateUnit": "esriTimeUnitsSeconds",
+      "blendingMode": "Alpha",
+      "allowDrapingOnIntegratedMesh": true,
+      "featureTable": {
+        "type": "CIMFeatureTable",
+        "displayField": "FID",
+        "editable": true,
+        "dataConnection": {
+          "type": "CIMStandardDataConnection",
+          "workspaceConnectionString": "DATABASE=..\\data\\water_area",
+          "workspaceFactory": "Shapefile",
+          "dataset": "water_area.shp",
+          "datasetType": "esriDTShapefile"
+        },
+        "studyAreaSpatialRel": "esriSpatialRelUndefined",
+        "searchOrder": "esriSearchOrderSpatial"
+      },
+      "featureBlendingMode": "Alpha",
+      "renderer": {
+        "type": "CIMSimpleRenderer",
+        "patch": "Default",
+        "symbol": {
+          "type": "CIMSymbolReference",
+          "symbol": {
+            "type": "CIMPolygonSymbol",
+            "symbolLayers": [
+              {
+                "type": "CIMSolidStroke",
+                "enable": true,
+                "capStyle": "Round",
+                "joinStyle": "Round",
+                "lineStyle3D": "Strip",
+                "miterLimit": 10,
+                "width": 0.4,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    127,
+                    167,
+                    196,
+                    100
+                  ]
+                }
+              },
+              {
+                "type": "CIMSolidFill",
+                "enable": true,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    170,
+                    201,
+                    224,
+                    90
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "label": "Lakes & rivers"
+      }
+    }
+  ],
+  "binaryReferences": [],
+  "elevationSurfaceLayerDefinitions": [],
+  "rGBColorProfile": "sRGB IEC61966-2.1",
+  "cMYKColorProfile": "U.S. Web Coated (SWOP) v2"
+}

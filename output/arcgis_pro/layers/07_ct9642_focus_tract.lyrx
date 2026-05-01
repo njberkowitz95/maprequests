@@ -1,0 +1,99 @@
+{
+  "type": "CIMLayerDocument",
+  "version": "3.0.0",
+  "build": 36056,
+  "layers": [
+    "CIMPATH=Map/ct9642_focus_tract.xml"
+  ],
+  "layerDefinitions": [
+    {
+      "type": "CIMFeatureLayer",
+      "name": "Focus area — Census Tract 9642",
+      "uRI": "CIMPATH=Map/ct9642_focus_tract.xml",
+      "sourceModifiedTime": {
+        "type": "TimeInstant"
+      },
+      "useSourceMetadata": true,
+      "description": "",
+      "layerElevation": {
+        "type": "CIMLayerElevationSurface",
+        "mapElevationID": "{8AC7B2D6-8E66-4F9A-9C40-2E1C36F3B3A2}"
+      },
+      "expanded": true,
+      "layerType": "Operational",
+      "showLegends": true,
+      "visibility": true,
+      "displayCacheType": "Permanent",
+      "maxDisplayCacheAge": 5,
+      "showPopups": true,
+      "serviceLayerID": -1,
+      "refreshRate": -1,
+      "refreshRateUnit": "esriTimeUnitsSeconds",
+      "blendingMode": "Alpha",
+      "allowDrapingOnIntegratedMesh": true,
+      "featureTable": {
+        "type": "CIMFeatureTable",
+        "displayField": "GEOID",
+        "editable": true,
+        "dataConnection": {
+          "type": "CIMStandardDataConnection",
+          "workspaceConnectionString": "DATABASE=..\\data\\ct9642_focus_tract",
+          "workspaceFactory": "Shapefile",
+          "dataset": "ct9642_focus_tract.shp",
+          "datasetType": "esriDTShapefile"
+        },
+        "studyAreaSpatialRel": "esriSpatialRelUndefined",
+        "searchOrder": "esriSearchOrderSpatial"
+      },
+      "featureBlendingMode": "Alpha",
+      "renderer": {
+        "type": "CIMSimpleRenderer",
+        "patch": "Default",
+        "symbol": {
+          "type": "CIMSymbolReference",
+          "symbol": {
+            "type": "CIMPolygonSymbol",
+            "symbolLayers": [
+              {
+                "type": "CIMSolidStroke",
+                "enable": true,
+                "capStyle": "Round",
+                "joinStyle": "Round",
+                "lineStyle3D": "Strip",
+                "miterLimit": 10,
+                "width": 2.4,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    10,
+                    37,
+                    64,
+                    100
+                  ]
+                }
+              },
+              {
+                "type": "CIMSolidFill",
+                "enable": true,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    31,
+                    111,
+                    235,
+                    45
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "label": "Census Tract 9642"
+      }
+    }
+  ],
+  "binaryReferences": [],
+  "elevationSurfaceLayerDefinitions": [],
+  "rGBColorProfile": "sRGB IEC61966-2.1",
+  "cMYKColorProfile": "U.S. Web Coated (SWOP) v2"
+}

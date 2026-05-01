@@ -1,0 +1,96 @@
+{
+  "type": "CIMLayerDocument",
+  "version": "3.0.0",
+  "build": 36056,
+  "layers": [
+    "CIMPATH=Map/fremont_place.xml"
+  ],
+  "layerDefinitions": [
+    {
+      "type": "CIMFeatureLayer",
+      "name": "City of Fremont (place)",
+      "uRI": "CIMPATH=Map/fremont_place.xml",
+      "sourceModifiedTime": {
+        "type": "TimeInstant"
+      },
+      "useSourceMetadata": true,
+      "description": "",
+      "layerElevation": {
+        "type": "CIMLayerElevationSurface",
+        "mapElevationID": "{8AC7B2D6-8E66-4F9A-9C40-2E1C36F3B3A2}"
+      },
+      "expanded": true,
+      "layerType": "Operational",
+      "showLegends": true,
+      "visibility": true,
+      "displayCacheType": "Permanent",
+      "maxDisplayCacheAge": 5,
+      "showPopups": true,
+      "serviceLayerID": -1,
+      "refreshRate": -1,
+      "refreshRateUnit": "esriTimeUnitsSeconds",
+      "blendingMode": "Alpha",
+      "allowDrapingOnIntegratedMesh": true,
+      "featureTable": {
+        "type": "CIMFeatureTable",
+        "displayField": "FID",
+        "editable": true,
+        "dataConnection": {
+          "type": "CIMStandardDataConnection",
+          "workspaceConnectionString": "DATABASE=..\\data\\fremont_place",
+          "workspaceFactory": "Shapefile",
+          "dataset": "fremont_place.shp",
+          "datasetType": "esriDTShapefile"
+        },
+        "studyAreaSpatialRel": "esriSpatialRelUndefined",
+        "searchOrder": "esriSearchOrderSpatial"
+      },
+      "featureBlendingMode": "Alpha",
+      "renderer": {
+        "type": "CIMSimpleRenderer",
+        "patch": "Default",
+        "symbol": {
+          "type": "CIMSymbolReference",
+          "symbol": {
+            "type": "CIMPolygonSymbol",
+            "symbolLayers": [
+              {
+                "type": "CIMSolidStroke",
+                "enable": true,
+                "capStyle": "Round",
+                "joinStyle": "Round",
+                "lineStyle3D": "Strip",
+                "miterLimit": 10,
+                "width": 1.7,
+                "color": {
+                  "type": "CIMRGBColor",
+                  "values": [
+                    31,
+                    78,
+                    107,
+                    100
+                  ]
+                },
+                "effects": [
+                  {
+                    "type": "CIMGeometricEffectDashes",
+                    "dashTemplate": [
+                      5,
+                      3
+                    ],
+                    "lineDashEnding": "NoConstraint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "label": "City of Fremont"
+      }
+    }
+  ],
+  "binaryReferences": [],
+  "elevationSurfaceLayerDefinitions": [],
+  "rGBColorProfile": "sRGB IEC61966-2.1",
+  "cMYKColorProfile": "U.S. Web Coated (SWOP) v2"
+}

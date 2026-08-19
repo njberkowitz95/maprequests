@@ -14,15 +14,15 @@ Fremont is Census place **GEOID 3117670** (`Fremont city`) in Dodge County, Nebr
 
 A tract is included if it **intersects** the city limit. Colored fills are **clipped to the place boundary**; dashed lines show where a tract continues outside the city. That is the standard way to map “tracts within a city” without implying that statistical units stop at the municipal line.
 
-| Tract | GEOID | Role |
-| --- | --- | --- |
-| 9638 | 31053963800 | Northwest (small share of a larger rural tract) |
-| 9639 | 31053963900 | West |
-| 9640 | 31053964000 | Center (entirely inside the city) |
-| 9641 | 31053964100 | East |
-| 9642 | 31053964200 | South-center |
-| 9643 | 31053964300 | Southeast |
-| 9644 | 31053964400 | Southwest |
+| Tract | GEOID | Area inside city | Share of tract in city |
+| --- | --- | --- | --- |
+| 9638 | 31053963800 | 2.93 sq mi | 5.6% |
+| 9639 | 31053963900 | 1.64 sq mi | 91.3% |
+| 9640 | 31053964000 | 0.67 sq mi | 100% |
+| 9641 | 31053964100 | 1.54 sq mi | 78.2% |
+| 9642 | 31053964200 | 0.95 sq mi | 100% |
+| 9643 | 31053964300 | 1.75 sq mi | 49.3% |
+| 9644 | 31053964400 | 1.62 sq mi | 12.3% |
 
 Tracts 9636 and 9637 (Dodge County) do not intersect Fremont and are omitted.
 

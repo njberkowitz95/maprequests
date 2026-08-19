@@ -94,7 +94,7 @@ PALETTE = {
     "page": "#f7f4ee",
     "panel": "#fffdf8",
     "land": "#ebe4d6",
-    "outside": "#d9d2c3",
+    "outside": "#cfc5b3",
     "tract_edge": "#3d3a32",
     "tract_edge_out": "#9a9284",
     "city_edge": "#1a365d",
@@ -117,7 +117,6 @@ ROAD_LABELS = {
     "US Hwy 30": "US 30",
     "US Hwy 77": "US 77",
     "US Hwy 275": "US 275",
-    "US Hwy 30 Bus": "US 30 Bus",
 }
 
 
@@ -127,7 +126,7 @@ ROAD_LABELS = {
 
 def configure_fonts() -> str:
     available = {f.name for f in fm.fontManager.ttflist}
-    for family in ("Source Sans 3", "Public Sans", "Inter", "Liberation Sans", "DejaVu Sans"):
+    for family in ("Public Sans", "Liberation Sans", "Source Sans 3", "Inter", "DejaVu Sans"):
         if family in available:
             plt.rcParams.update({
                 "font.family": family,
@@ -198,16 +197,26 @@ def aspect_corrected_extent(
     bounds: tuple[float, float, float, float],
     target_ratio: float,
     pad: float = 0.08,
+    extra_south: float = 0.0,
 ) -> tuple[float, float, float, float]:
     minx, miny, maxx, maxy = bounds
-    cx, cy = (minx + maxx) / 2.0, (miny + maxy) / 2.0
-    width, height = (maxx - minx) * (1 + pad * 2), (maxy - miny) * (1 + pad * 2)
+    cx = (minx + maxx) / 2.0
+    width = (maxx - minx) * (1 + pad * 2)
+    height = (maxy - miny) * (1 + pad * 2)
+    miny_adj = ((miny + maxy) / 2.0) - height / 2 - extra_south * (maxy - miny)
+    maxy_adj = ((miny + maxy) / 2.0) + height / 2
+    cy = (miny_adj + maxy_adj) / 2.0
+    height = maxy_adj - miny_adj
     current = width / height if height else target_ratio
     if current < target_ratio:
         width = height * target_ratio
     else:
         height = width / target_ratio
     return (cx - width / 2, cy - height / 2, cx + width / 2, cy + height / 2)
+
+
+def rounded_scale(value: float, step: int = 1000) -> int:
+    return max(step, int(round(value / step) * step))
 
 
 def longest_segment(geom) -> LineString | None:
@@ -248,28 +257,28 @@ def halo(size: float = 2.8, color: str = "white") -> list:
     return [path_effects.Stroke(linewidth=size, foreground=color), path_effects.Normal()]
 
 
-def add_scale_bar(ax: plt.Axes, length_miles: float = 1.0) -> None:
+def add_scale_bar(ax: plt.Axes, length_miles: float, rf: int) -> None:
     x0, x1 = ax.get_xlim()
     y0, y1 = ax.get_ylim()
     length_m = length_miles * METERS_PER_MILE
     n_seg = 2
     segment_m = length_m / n_seg
-    start_x = x0 + (x1 - x0) * 0.035
-    start_y = y0 + (y1 - y0) * 0.045
-    height = (y1 - y0) * 0.012
+    start_x = x0 + (x1 - x0) * 0.03
+    start_y = y0 + (y1 - y0) * 0.038
+    height = (y1 - y0) * 0.011
+    pad_x = (x1 - x0) * 0.014
     colors = ["#1c1917", "#ffffff"]
 
-    background = mpatches.FancyBboxPatch(
-        (start_x - (x1 - x0) * 0.012, start_y - height * 1.6),
-        length_m + (x1 - x0) * 0.055,
-        height * 5.2,
-        boxstyle="round,pad=0,rounding_size=0",
+    ax.add_patch(mpatches.Rectangle(
+        (start_x - pad_x, start_y - height * 2.35),
+        length_m + pad_x * 2.4,
+        height * 7.6,
         facecolor="#f7f4ee",
-        edgecolor="none",
-        alpha=0.82,
+        edgecolor=PALETTE["frame"],
+        linewidth=0.4,
+        alpha=0.92,
         zorder=29,
-    )
-    ax.add_patch(background)
+    ))
 
     for idx in range(n_seg):
         ax.add_patch(mpatches.Rectangle(
@@ -286,39 +295,42 @@ def add_scale_bar(ax: plt.Axes, length_miles: float = 1.0) -> None:
     positions = [start_x, start_x + segment_m, start_x + length_m]
     for x, text in zip(positions, labels):
         ax.text(
-            x, start_y + height * 1.55, text,
-            ha="center", va="bottom", fontsize=7.5,
+            x, start_y + height * 1.45, text,
+            ha="center", va="bottom", fontsize=7.4,
             color=PALETTE["label_dark"], zorder=31,
         )
+    ax.text(
+        start_x + length_m / 2, start_y - height * 0.55,
+        f"Scale 1:{rf:,}",
+        ha="center", va="top", fontsize=6.8,
+        color=PALETTE["label_muted"], zorder=31,
+    )
 
 
 def add_north_arrow(ax: plt.Axes) -> None:
     """Grid-north arrow in axes coordinates (State Plane y-axis)."""
-    cx, cy = 0.955, 0.86
-    shaft = mpatches.FancyBboxPatch(
-        (cx - 0.006, cy),
-        0.012,
-        0.055,
+    cx, cy = 0.955, 0.82
+    ax.add_patch(mpatches.FancyBboxPatch(
+        (cx - 0.028, cy - 0.012), 0.056, 0.175,
         boxstyle="square,pad=0",
-        facecolor=PALETTE["frame"],
-        edgecolor="none",
-        transform=ax.transAxes,
-        zorder=40,
-    )
-    ax.add_patch(shaft)
-    head = Polygon(
-        [(cx - 0.018, cy + 0.055), (cx + 0.018, cy + 0.055), (cx, cy + 0.105)],
-        closed=True,
-        facecolor=PALETTE["frame"],
-        edgecolor="none",
-        transform=ax.transAxes,
-        zorder=41,
-    )
-    ax.add_patch(head)
+        facecolor="#f7f4ee", edgecolor=PALETTE["frame"], linewidth=0.4,
+        transform=ax.transAxes, zorder=39, alpha=0.92,
+    ))
+    ax.add_patch(Polygon(
+        [(cx - 0.007, cy + 0.012), (cx + 0.007, cy + 0.012),
+         (cx + 0.007, cy + 0.078), (cx - 0.007, cy + 0.078)],
+        closed=True, facecolor=PALETTE["frame"], edgecolor="white",
+        linewidth=0.4, transform=ax.transAxes, zorder=40,
+    ))
+    ax.add_patch(Polygon(
+        [(cx - 0.018, cy + 0.072), (cx + 0.018, cy + 0.072), (cx, cy + 0.128)],
+        closed=True, facecolor=PALETTE["frame"], edgecolor="white",
+        linewidth=0.4, transform=ax.transAxes, zorder=41,
+    ))
     ax.text(
-        cx, cy + 0.112, "N",
+        cx, cy + 0.138, "N",
         transform=ax.transAxes, ha="center", va="bottom",
-        fontsize=10, weight="bold", color=PALETTE["frame"], zorder=42,
+        fontsize=9, weight="bold", color=PALETTE["frame"], zorder=42,
     )
 
 
@@ -352,10 +364,10 @@ def draw_locator(
 
     nebraska.plot(ax=ax, color="#f3eee4", edgecolor=PALETTE["city_edge"], linewidth=0.9, zorder=2)
     ne_counties.boundary.plot(ax=ax, color="#c5bba8", linewidth=0.25, zorder=3)
-    dodge.plot(ax=ax, color="#1a365d", edgecolor="#0f2440", linewidth=0.4, zorder=4)
+    dodge.plot(ax=ax, color="#c2410c", edgecolor="#7c2d12", linewidth=0.45, zorder=4)
 
     pt = fremont_ll.geometry.union_all().centroid
-    ax.scatter([pt.x], [pt.y], s=14, c="#e07a5f", edgecolors="white", linewidths=0.6, zorder=5)
+    ax.scatter([pt.x], [pt.y], s=18, c="#f8fafc", edgecolors="#1a365d", linewidths=0.8, zorder=5)
 
     minx, miny, maxx, maxy = nebraska.total_bounds
     pad_x, pad_y = (maxx - minx) * 0.04, (maxy - miny) * 0.06
@@ -367,7 +379,6 @@ def draw_locator(
     for spine in ax.spines.values():
         spine.set_edgecolor(PALETTE["frame"])
         spine.set_linewidth(0.6)
-    ax.set_title("Nebraska", fontsize=8, color=PALETTE["label_dark"], pad=3, loc="left")
 
 
 # --------------------------------------------------------------------------- #
@@ -430,7 +441,16 @@ def style_map_frame(ax: plt.Axes) -> None:
         spine.set_linewidth(1.15)
 
 
-def draw_main_map(ax: plt.Axes, data: dict, extent: tuple[float, float, float, float]) -> None:
+def _too_close(x: float, y: float, points: list[tuple[float, float]], thresh: float) -> bool:
+    return any((x - px) ** 2 + (y - py) ** 2 < thresh ** 2 for px, py in points)
+
+
+def draw_main_map(
+    ax: plt.Axes,
+    data: dict,
+    extent: tuple[float, float, float, float],
+    map_width_in: float,
+) -> None:
     extent_geom = box(*extent)
     city = data["city"]
     clipped = data["clipped"]
@@ -441,14 +461,12 @@ def draw_main_map(ax: plt.Axes, data: dict, extent: tuple[float, float, float, f
     ax.set_aspect("equal")
     style_map_frame(ax)
 
-    # Land outside the city.
     outside = extent_geom.difference(city)
     if not outside.is_empty:
         gpd.GeoSeries([outside], crs=PROJECT_CRS).plot(
             ax=ax, color=PALETTE["outside"], edgecolor="none", zorder=1,
         )
 
-    # Full tract lines that continue beyond city limits (context).
     outside_tracts = intersecting.copy()
     outside_tracts["geometry"] = outside_tracts.geometry.difference(city)
     outside_tracts = outside_tracts.loc[~outside_tracts.geometry.is_empty]
@@ -458,13 +476,8 @@ def draw_main_map(ax: plt.Axes, data: dict, extent: tuple[float, float, float, f
             linestyle=(0, (4, 2.5)), zorder=3,
         )
 
-    # Tract fills inside the city.
-    for _, row in clipped.iterrows():
-        gpd.GeoSeries([row.geometry], crs=PROJECT_CRS).plot(
-            ax=ax, color=row["fill"], edgecolor="none", zorder=4,
-        )
+    clipped.plot(ax=ax, color=clipped["fill"], edgecolor="none", zorder=4)
 
-    # Hydrography.
     water_area = clip_to_extent(data["water_area"], extent_geom)
     if not water_area.empty:
         water_area.plot(
@@ -473,11 +486,12 @@ def draw_main_map(ax: plt.Axes, data: dict, extent: tuple[float, float, float, f
         )
     water_line = clip_to_extent(data["water_line"], extent_geom)
     if not water_line.empty:
-        major = water_line[water_line["FULLNAME"].fillna("").str.contains("Crk|Creek|River", case=False)]
+        major = water_line[water_line["FULLNAME"].fillna("").str.contains(
+            r"Crk|Creek|Riv|River", case=False,
+        )]
         draw_lines = major if not major.empty else water_line
         draw_lines.plot(ax=ax, color=PALETTE["water_line"], linewidth=0.9, zorder=6)
 
-    # Roads.
     roads = clip_to_extent(data["roads"], extent_geom)
     local = roads[roads["MTFCC"] == "S1400"]
     arterial = roads[roads["MTFCC"] == "S1200"]
@@ -488,50 +502,91 @@ def draw_main_map(ax: plt.Axes, data: dict, extent: tuple[float, float, float, f
         if not in_city.empty:
             in_city.plot(ax=ax, color=PALETTE["local"], linewidth=0.28, zorder=7)
     if not arterial.empty:
-        arterial.plot(ax=ax, color=PALETTE["road_case"], linewidth=1.55, zorder=8, solid_capstyle="round")
-        arterial.plot(ax=ax, color=PALETTE["arterial"], linewidth=0.7, zorder=9, solid_capstyle="round")
+        arterial.plot(ax=ax, color=PALETTE["road_case"], linewidth=1.55, zorder=8, capstyle="round")
+        arterial.plot(ax=ax, color=PALETTE["arterial"], linewidth=0.7, zorder=9, capstyle="round")
     if not highway.empty:
-        highway.plot(ax=ax, color=PALETTE["road_case"], linewidth=2.15, zorder=10, solid_capstyle="round")
-        highway.plot(ax=ax, color=PALETTE["highway"], linewidth=1.05, zorder=11, solid_capstyle="round")
+        highway.plot(ax=ax, color=PALETTE["road_case"], linewidth=2.15, zorder=10, capstyle="round")
+        highway.plot(ax=ax, color=PALETTE["highway"], linewidth=1.05, zorder=11, capstyle="round")
 
-    # Tract boundaries inside the city (on top of roads so units stay clear).
-    clipped.boundary.plot(ax=ax, color=PALETTE["tract_edge"], linewidth=1.05, zorder=12)
+    clipped.boundary.plot(ax=ax, color=PALETTE["tract_edge"], linewidth=1.1, zorder=12)
 
-    # City limit.
     fremont_outline = data["fremont"].boundary
-    fremont_outline.plot(ax=ax, color="white", linewidth=3.0, zorder=13)
-    fremont_outline.plot(ax=ax, color=PALETTE["city_edge"], linewidth=1.45, zorder=14)
+    fremont_outline.plot(ax=ax, color="white", linewidth=3.1, zorder=13)
+    fremont_outline.plot(ax=ax, color=PALETTE["city_edge"], linewidth=1.55, zorder=14)
 
-    # Tract labels at representative points of the city-clipped polygons.
+    tract_pts: list[tuple[float, float]] = []
     for _, row in clipped.iterrows():
         pt = row.geometry.representative_point()
+        tract_pts.append((pt.x, pt.y))
         label_point(ax, pt.x, pt.y, row["tract"], size=11)
 
-    # Highway labels.
-    label_clip = box(extent[0], extent[1], extent[2], extent[3])
+    # Hydrography labels (italic, water-blue).
+    if not water_area.empty:
+        platte = water_area[water_area["FULLNAME"].fillna("").eq("Platte Riv")]
+        if not platte.empty:
+            geom = platte.geometry.union_all()
+            south = box(extent[0], extent[1], extent[2], extent[1] + (extent[3] - extent[1]) * 0.38)
+            target = geom.intersection(south)
+            if target.is_empty:
+                target = geom
+            pt = target.representative_point()
+            txt = ax.text(
+                pt.x, pt.y, "Platte River", ha="center", va="center",
+                fontsize=8.2, style="italic", color="#1d4e6e", zorder=17,
+            )
+            txt.set_path_effects(halo(3.0, "#eaf4fa"))
+
+        lakes = water_area[water_area["FULLNAME"].fillna("").str.contains(
+            r"Fremont Lk|Ridgewood|Rainbow|Leisure|Summer Haven|Lk Leba",
+            case=False,
+        )]
+        if not lakes.empty:
+            west = lakes[lakes.centroid.x < city.centroid.x]
+            cluster = west if not west.empty else lakes
+            pt = cluster.geometry.union_all().representative_point()
+            if not _too_close(pt.x, pt.y, tract_pts, 550):
+                txt = ax.text(
+                    pt.x, pt.y, "Fremont Lakes", ha="center", va="center",
+                    fontsize=7.4, style="italic", color="#1d4e6e", zorder=17,
+                )
+                txt.set_path_effects(halo(2.6, "#eaf4fa"))
+
+    label_clip = box(*extent)
     seen: set[str] = set()
-    label_source = pd.concat(
-        [highway.assign(_kind="hw"), arterial.assign(_kind="art")],
-        ignore_index=True,
-    ) if not highway.empty or not arterial.empty else pd.DataFrame()
-    if not label_source.empty:
+    frames = []
+    if not highway.empty:
+        frames.append(highway)
+    if not arterial.empty:
+        frames.append(arterial)
+    if frames:
+        label_source = pd.concat(frames, ignore_index=True)
         for _, row in label_source.dropna(subset=["FULLNAME"]).iterrows():
             raw = row["FULLNAME"]
             if raw not in ROAD_LABELS or raw in seen:
                 continue
             seg = longest_segment(row.geometry.intersection(label_clip))
-            if seg is None or seg.length < 700:
+            if seg is None or seg.length < 800:
                 continue
-            seen.add(raw)
-            pt = seg.interpolate(0.42, normalized=True)
-            txt = ax.text(
-                pt.x, pt.y, ROAD_LABELS[raw],
-                ha="center", va="center", fontsize=7,
-                color="#3f3a32", zorder=16, style="italic",
-            )
-            txt.set_path_effects(halo(2.4))
+            placed = False
+            for frac in (0.28, 0.55, 0.72):
+                pt = seg.interpolate(frac, normalized=True)
+                if pt.is_empty or _too_close(pt.x, pt.y, tract_pts, 480):
+                    continue
+                seen.add(raw)
+                txt = ax.text(
+                    pt.x, pt.y, ROAD_LABELS[raw],
+                    ha="center", va="center", fontsize=7,
+                    color="#3f3a32", zorder=16, style="italic",
+                )
+                txt.set_path_effects(halo(2.4))
+                placed = True
+                break
+            if placed:
+                continue
 
-    add_scale_bar(ax, length_miles=1.0)
+    ground_m = extent[2] - extent[0]
+    rf = rounded_scale(ground_m / (map_width_in * 0.0254))
+    add_scale_bar(ax, length_miles=1.0, rf=rf)
     add_north_arrow(ax)
 
 
@@ -547,20 +602,20 @@ def draw_side_panel(ax: plt.Axes, locator_ax: plt.Axes, data: dict) -> None:
 
     clipped = data["clipped"]
 
-    ax.text(0.07, 0.975, "LEGEND", fontsize=11, weight="bold",
+    ax.text(0.07, 0.978, "LEGEND", fontsize=11, weight="bold",
             color=PALETTE["label_dark"], va="top")
-    ax.plot([0.07, 0.93], [0.948, 0.948], color=PALETTE["title_bar"], linewidth=1.1)
+    ax.plot([0.07, 0.93], [0.955, 0.955], color=PALETTE["title_bar"], linewidth=1.1)
 
-    ax.text(0.07, 0.925, "2020 Census tracts", fontsize=9, weight="bold",
+    ax.text(0.07, 0.935, "2020 Census tracts", fontsize=9, weight="bold",
             color=PALETTE["label_dark"], va="top")
     ax.text(
-        0.07, 0.900,
-        "Colored area is the portion inside\nFremont city limits.",
-        fontsize=7.4, color=PALETTE["label_muted"], va="top", linespacing=1.25,
+        0.07, 0.912,
+        "Fill shows the portion inside Fremont\ncity limits. Area is that clipped part.",
+        fontsize=7.3, color=PALETTE["label_muted"], va="top", linespacing=1.25,
     )
 
-    y = 0.848
-    sw_w, sw_h = 0.10, 0.028
+    y = 0.858
+    sw_w, sw_h = 0.10, 0.026
     for _, row in clipped.iterrows():
         ax.add_patch(mpatches.Rectangle(
             (0.07, y), sw_w, sw_h,
@@ -570,23 +625,21 @@ def draw_side_panel(ax: plt.Axes, locator_ax: plt.Axes, data: dict) -> None:
         ax.text(
             0.20, y + sw_h / 2,
             f"Tract {row['tract']}",
-            fontsize=8.4, color=PALETTE["label_dark"], va="center",
+            fontsize=8.2, color=PALETTE["label_dark"], va="center",
             transform=ax.transAxes,
         )
         ax.text(
             0.93, y + sw_h / 2,
             f"{row['area_sqmi']:.2f} sq mi",
-            fontsize=7.6, color=PALETTE["label_muted"], va="center", ha="right",
+            fontsize=7.4, color=PALETTE["label_muted"], va="center", ha="right",
             transform=ax.transAxes,
         )
-        y -= 0.040
+        y -= 0.036
 
-    y -= 0.012
-    ax.plot([0.07, 0.93], [y + 0.018, y + 0.018], color=PALETTE["rule"], linewidth=0.6)
-
+    y -= 0.006
+    ax.plot([0.07, 0.93], [y + 0.016, y + 0.016], color=PALETTE["rule"], linewidth=0.6)
     ax.text(0.07, y, "Map symbols", fontsize=9, weight="bold",
             color=PALETTE["label_dark"], va="top")
-    y -= 0.012
 
     handles = [
         mlines.Line2D([], [], color=PALETTE["city_edge"], linewidth=1.8, label="Fremont city limit"),
@@ -596,51 +649,52 @@ def draw_side_panel(ax: plt.Axes, locator_ax: plt.Axes, data: dict) -> None:
             linestyle=(0, (4, 2.5)), label="Tract continues outside city",
         ),
         mlines.Line2D([], [], color=PALETTE["highway"], linewidth=1.6, label="U.S. highway"),
-        mlines.Line2D([], [], color=PALETTE["arterial"], linewidth=1.1, label="Arterial / state route"),
+        mlines.Line2D([], [], color=PALETTE["arterial"], linewidth=1.1, label="Arterial / connector"),
         mlines.Line2D([], [], color=PALETTE["local"], linewidth=0.8, label="Local street"),
         mpatches.Patch(
             facecolor=PALETTE["water_fill"], edgecolor=PALETTE["water_edge"],
-            linewidth=0.5, label="Lakes & ponds",
+            linewidth=0.5, label="River, lakes & ponds",
         ),
     ]
     legend = ax.legend(
         handles=handles,
         loc="upper left",
-        bbox_to_anchor=(0.05, y),
+        bbox_to_anchor=(0.05, y - 0.012),
         frameon=False,
-        fontsize=7.8,
-        labelspacing=0.55,
-        handlelength=2.1,
-        handletextpad=0.7,
+        fontsize=7.6,
+        labelspacing=0.48,
+        handlelength=2.0,
+        handletextpad=0.65,
         borderpad=0.0,
     )
     ax.add_artist(legend)
 
     ax.text(
-        0.07, 0.268,
+        0.07, 0.395,
         "Selection",
         fontsize=9, weight="bold", color=PALETTE["label_dark"], va="top",
     )
     ax.text(
-        0.07, 0.242,
+        0.07, 0.372,
         f"{len(clipped)} tracts intersect Fremont city\n"
         f"(Census place GEOID {FREMONT_PLACE_GEOID}).\n"
-        f"City land & water: {data['city_area_sqmi']:.2f} sq mi.",
-        fontsize=7.4, color=PALETTE["label_muted"], va="top", linespacing=1.35,
+        f"City land & water: {data['city_area_sqmi']:.2f} sq mi.\n"
+        "Tracts 9636 and 9637 (Dodge Co.)\ndo not meet the city and are omitted.",
+        fontsize=7.3, color=PALETTE["label_muted"], va="top", linespacing=1.32,
     )
 
     ax.text(
-        0.07, 0.168,
-        "Locator",
+        0.07, 0.248,
+        "Locator  ·  Nebraska",
         fontsize=9, weight="bold", color=PALETTE["label_dark"], va="top",
     )
 
     draw_locator(locator_ax, data["states"], data["counties"], data["fremont"].to_crs(data["states"].crs))
 
     ax.text(
-        0.07, 0.018,
-        "Dodge County is filled; Fremont\nis the orange point.",
-        fontsize=7.2, color=PALETTE["label_muted"], va="bottom", linespacing=1.25,
+        0.07, 0.016,
+        "Orange: Dodge County.  White point: Fremont.",
+        fontsize=7.0, color=PALETTE["label_muted"], va="bottom",
     )
 
 
@@ -733,25 +787,27 @@ def build_map(output_dir: Path, basename: str = "fremont_ne_census_tracts") -> d
     side_ax = fig.add_axes(inches_rect(fig, side_x, body_y, side_w, body_h))
     foot_ax = fig.add_axes(inches_rect(fig, margin, footer_y, fig_w - 2 * margin, footer_h))
 
-    # Locator nested in the lower portion of the side panel.
-    loc_w, loc_h = side_w * 0.86, body_h * 0.175
+    # Locator in the lower portion of the side panel (below the "Locator" heading).
+    loc_w, loc_h = side_w * 0.82, 1.52
     loc_x = side_x + (side_w - loc_w) / 2
-    loc_y = body_y + body_h * 0.055
+    loc_y = body_y + 0.34
     locator_ax = fig.add_axes(inches_rect(fig, loc_x, loc_y, loc_w, loc_h))
 
     map_ratio = map_w / body_h
-    extent = aspect_corrected_extent(tuple(data["fremont"].total_bounds), map_ratio, pad=0.07)
+    extent = aspect_corrected_extent(
+        tuple(data["fremont"].total_bounds), map_ratio, pad=0.06, extra_south=0.08,
+    )
 
     draw_title(title_ax)
-    draw_main_map(map_ax, data, extent)
+    draw_main_map(map_ax, data, extent, map_width_in=map_w)
     draw_side_panel(side_ax, locator_ax, data)
     draw_footer(foot_ax)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = output_dir / f"{basename}.pdf"
     png_path = output_dir / f"{basename}.png"
-    fig.savefig(pdf_path, facecolor=fig.get_facecolor(), bbox_inches="tight", pad_inches=0.15)
-    fig.savefig(png_path, facecolor=fig.get_facecolor(), dpi=220, bbox_inches="tight", pad_inches=0.15)
+    fig.savefig(pdf_path, facecolor=fig.get_facecolor())
+    fig.savefig(png_path, facecolor=fig.get_facecolor(), dpi=200)
     plt.close(fig)
 
     print(f"Wrote {pdf_path}")
